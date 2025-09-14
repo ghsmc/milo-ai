@@ -1,4 +1,4 @@
-import { OnboardingData } from '../lib/supabase';
+import { OnboardingData } from '../lib/supabase.ts';
 import allJobsData from '../data/allJobs.json';
 
 export interface MatchedJob {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useDarkMode } from '../contexts/DarkModeContext';
 import allJobsData from '../data/allJobs.json';
-import { OnboardingData } from '../lib/supabase';
+import { OnboardingData } from '../lib/supabase.ts';
 import { JobMatchingService } from '../services/jobMatching';
 import { JobService, Job } from '../services/jobService';
 import { MiloOpportunities } from './MiloOpportunities';

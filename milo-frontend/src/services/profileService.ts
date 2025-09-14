@@ -1,4 +1,4 @@
-import { OnboardingData } from '../lib/supabase';
+import { OnboardingData } from '../lib/supabase.ts';
 
 export interface ProfileResponse {
   success: boolean;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { miloScout, MiloResponse, StudentProfile } from '../lib/milo-opportunity-scout';
-import { OnboardingData } from '../lib/supabase';
+import { miloScout, MiloResponse, StudentProfile } from '../lib/milo-opportunity-scout.ts';
+import { OnboardingData } from '../lib/supabase.ts';
 
 interface MiloOpportunitiesProps {
   userProfile: OnboardingData | null;

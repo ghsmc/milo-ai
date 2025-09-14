@@ -9,7 +9,7 @@ import { JobCard } from './components/JobCard';
 import PeopleTable from './components/PeopleTable';
 import Feed from './components/Feed';
 import { mockJobCards } from './data/mockJobCards';
-import { OnboardingData } from './lib/supabase';
+import { OnboardingData } from './lib/supabase.ts';
 import { DarkModeProvider, useDarkMode } from './contexts/DarkModeContext';
 import { miloAPIService, MiloResponse, AlumniProfile } from './lib/milo-api.ts';
 import ReactMarkdown from 'react-markdown';

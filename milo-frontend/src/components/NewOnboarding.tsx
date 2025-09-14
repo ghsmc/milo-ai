@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useDarkMode } from '../contexts/DarkModeContext';
-import { OnboardingData } from '../lib/supabase';
+import { OnboardingData } from '../lib/supabase.ts';
 
 interface NewOnboardingProps {
   onComplete: (profileData: OnboardingData) => void;
