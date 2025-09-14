@@ -23,6 +23,11 @@ class MiloAI:
     def load_yale_data(self):
         """Load the real Yale alumni data from SQLite database with enhanced details"""
         try:
+            # Check if database file exists
+            if not os.path.exists('yale.db'):
+                print("Warning: yale.db not found. Using fallback data.")
+                return self.get_fallback_data()
+            
             conn = sqlite3.connect('yale.db')
             cursor = conn.cursor()
             
@@ -124,7 +129,26 @@ class MiloAI:
             return data
         except Exception as e:
             print(f"Error loading database: {e}")
-            return []  # Fallback if database not found
+            return self.get_fallback_data()
+    
+    def get_fallback_data(self):
+        """Return minimal fallback data when database is not available"""
+        return [
+            {
+                'person_id': 'fallback_1',
+                'name': 'Sample Yale Alumnus',
+                'position': 'Software Engineer',
+                'company': 'Tech Company',
+                'location': 'San Francisco, CA',
+                'about': 'Yale graduate working in technology',
+                'educations_details': 'Yale University - Computer Science',
+                'current_company_name': 'Tech Company',
+                'current_company_industry': 'Technology',
+                'current_company_size': '1000+',
+                'current_company_type': 'Public',
+                'current_company_description': 'Leading technology company'
+            }
+        ]
         
     async def analyze_career(self, user_input: str) -> dict:
         """Main function: dream job → actionable plan (Stockfish for careers)"""
