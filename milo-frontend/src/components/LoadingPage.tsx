@@ -15,6 +15,9 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({ onComplete }) => {
 
   // Timers to clean up
   const timers = useRef<number[]>([]);
+  
+  // Detect mobile device
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
   // ===== Initial logo reveal sequence =====
   useEffect(() => {
@@ -24,6 +27,18 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({ onComplete }) => {
     t(300,  () => setShowLayer1(true));
     t(500,  () => setShowLayer2(true));
     t(700,  () => setShowLayer3(true));
+
+    // Auto-skip on mobile after 3 seconds
+    if (isMobile) {
+      t(3000, () => {
+        if (!hasSlid) {
+          setIsSliding(true);
+          t(800, () => setHasSlid(true));
+        } else {
+          onComplete?.();
+        }
+      });
+    }
 
     const onKey = (event: KeyboardEvent) => {
       if (event.code === 'Space') {
@@ -42,7 +57,7 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({ onComplete }) => {
       document.removeEventListener('keydown', onKey);
       timers.current.forEach(clearTimeout);
     };
-  }, [hasSlid, onComplete]);
+  }, [hasSlid, onComplete, isMobile]);
 
   // After slide: show MILO
   useEffect(() => {
@@ -55,6 +70,16 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({ onComplete }) => {
       }, 100)
     );
   }, [hasSlid]);
+
+  // Handle tap/click to skip
+  const handleSkip = () => {
+    if (!hasSlid) {
+      setIsSliding(true);
+      timers.current.push(window.setTimeout(() => setHasSlid(true), 800));
+    } else {
+      onComplete?.();
+    }
+  };
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center relative overflow-hidden">
@@ -94,9 +119,20 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({ onComplete }) => {
       )}
 
       {/* Skip instruction */}
-      <div className={`absolute bottom-8 text-center transition-opacity duration-500 ${isSliding && !hasSlid ? 'opacity-0' : 'opacity-100'}`}>
+      <div 
+        className={`absolute bottom-8 text-center transition-opacity duration-500 cursor-pointer ${isSliding && !hasSlid ? 'opacity-0' : 'opacity-100'}`}
+        onClick={handleSkip}
+      >
         <div className="text-gray-400 text-sm tracking-wider">
-          Press <span className="bg-gray-800 text-gray-300 px-2 py-0.5 rounded">space</span> {hasSlid && showMilo ? 'to continue' : 'to start'}
+          {isMobile ? (
+            <>
+              Tap <span className="bg-gray-800 text-gray-300 px-2 py-0.5 rounded">anywhere</span> {hasSlid && showMilo ? 'to continue' : 'to start'}
+            </>
+          ) : (
+            <>
+              Press <span className="bg-gray-800 text-gray-300 px-2 py-0.5 rounded">space</span> {hasSlid && showMilo ? 'to continue' : 'to start'}
+            </>
+          )}
         </div>
       </div>
     </div>
