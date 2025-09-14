@@ -39,7 +39,11 @@ class CareerRequest(BaseModel):
 
 @app.get("/")
 async def read_index():
-    return FileResponse("index.html")
+    return {"message": "Milo AI Backend is running!", "status": "healthy"}
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "service": "milo-ai-backend"}
 
 @app.post("/analyze")
 async def analyze_career(request: CareerRequest):
