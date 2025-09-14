@@ -5,6 +5,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from milo_ai import MiloAI
 import uvicorn
+import os
+
+print("🚀 Starting Milo AI Backend...")
+print(f"📁 Working directory: {os.getcwd()}")
+print(f"🔑 OpenAI API Key present: {'OPENAI_API_KEY' in os.environ}")
 
 app = FastAPI()
 
@@ -32,7 +37,16 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="."), name="static")
 
 # Initialize Milo AI
-milo = MiloAI()
+try:
+    milo = MiloAI()
+    print("✅ Milo AI initialized successfully")
+except Exception as e:
+    print(f"❌ Error initializing Milo AI: {e}")
+    # Create a dummy milo object for basic functionality
+    class DummyMilo:
+        async def analyze_career(self, user_input: str):
+            return {"error": "Milo AI not available", "message": "Backend is running but AI service is unavailable"}
+    milo = DummyMilo()
 
 class CareerRequest(BaseModel):
     user_input: str
@@ -43,7 +57,7 @@ async def read_index():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "milo-ai-backend"}
+    return {"status": "healthy", "service": "milo-ai-backend", "milo_available": hasattr(milo, 'client')}
 
 @app.post("/analyze")
 async def analyze_career(request: CareerRequest):
