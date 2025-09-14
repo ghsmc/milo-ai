@@ -144,7 +144,7 @@ function AppContent() {
           content: `I'm sorry, I encountered an error while processing your request: ${response.error}\n\nPlease try again or rephrase your question.`,
           timestamp: new Date().toISOString()
         };
-        setMessages(prev => [...prev, errorMessage]);
+        setChatMessages(prev => [...prev, errorMessage]);
         return;
       }
       
