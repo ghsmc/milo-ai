@@ -21,111 +21,131 @@ class MiloAI:
         self.yale_data = self.load_yale_data()
         
     def load_yale_data(self):
-        """Load the real Yale alumni data from SQLite database with enhanced details"""
+        """Load Yale alumni data from available sources"""
         try:
-            # Check if database file exists
-            if not os.path.exists('yale.db'):
-                print("Warning: yale.db not found. Using fallback data.")
+            # Check for sample data (for Railway deployment)
+            if os.path.exists('sample_data.json'):
+                print("📊 Loading sample Yale dataset...")
+                with open('sample_data.json', 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                print(f"✅ Loaded {len(data)} sample profiles")
+                return data
+            
+            # Check for local SQLite database (for local development)
+            elif os.path.exists('yale.db'):
+                print("📊 Loading Yale dataset from local SQLite database...")
+                return self.load_from_sqlite()
+            
+            else:
+                print("⚠️  No Yale database found. Using fallback data.")
                 return self.get_fallback_data()
-            
-            conn = sqlite3.connect('yale.db')
-            cursor = conn.cursor()
-            
-            # Get comprehensive alumni data with experience history, education details, and company insights
-            query = """
-            SELECT 
-                person_id,
-                name,
-                position,
-                current_company_name,
-                location,
-                city,
-                country_code,
-                about,
-                connections,
-                followers,
-                recommendations_count,
-                educations_details,
-                current_company_name as company,
-                position as current_title,
-                educations_details as experience_history,
-                educations_details as education_details,
-                '' as company_industry,
-                '' as company_size,
-                0 as employee_count,
-                0 as yale_alumni_count
-            FROM people
-            WHERE name IS NOT NULL 
-            AND position IS NOT NULL
-            AND current_company_name IS NOT NULL
-            AND current_company_name != ''
-            AND educations_details LIKE '%Yale%'
-            ORDER BY connections DESC
-            LIMIT 5000
-            """
-            
-            cursor.execute(query)
-            profiles = cursor.fetchall()
-            
-            # Convert to list of dictionaries with enhanced parsing
-            data = []
-            for profile in profiles:
-                experience_history = []
-                if profile[14]:  # experience_history
-                    for exp in profile[14].split('||'):
-                        if exp and '|' in exp:
-                            parts = exp.split('|')
-                            if len(parts) >= 4:
-                                experience_history.append({
-                                    'company': parts[0],
-                                    'title': parts[1],
-                                    'start_date': parts[2],
-                                    'end_date': parts[3],
-                                    'description': parts[4] if len(parts) > 4 else ''
-                                })
                 
-                education_details = []
-                if profile[15]:  # education_details
-                    for edu in profile[15].split('||'):
-                        if edu and '|' in edu:
-                            parts = edu.split('|')
-                            if len(parts) >= 5:
-                                education_details.append({
-                                    'institution': parts[0],
-                                    'degree': parts[1],
-                                    'field': parts[2],
-                                    'start_year': parts[3],
-                                    'end_year': parts[4]
-                                })
-                
-                data.append({
-                    'person_id': profile[0],
-                    'name': profile[1],
-                    'position': profile[2],
-                    'company': profile[3],
-                    'location': profile[4],
-                    'city': profile[5],
-                    'country_code': profile[6],
-                    'about': profile[7],
-                    'connections': profile[8],
-                    'followers': profile[9],
-                    'recommendations_count': profile[10],
-                    'educations_details': profile[11],
-                    'current_company_name': profile[12],
-                    'current_title': profile[13],
-                    'experience_history': experience_history,
-                    'education_details': education_details,
-                    'company_industry': profile[16],
-                    'company_size': profile[17],
-                    'employee_count': profile[18],
-                    'yale_alumni_count': profile[19]
-                })
-            
-            conn.close()
-            return data
         except Exception as e:
-            print(f"Error loading database: {e}")
+            print(f"❌ Error loading Yale data: {e}")
             return self.get_fallback_data()
+    
+    def load_from_sqlite(self):
+        """Load data from SQLite database (local development)"""
+        conn = sqlite3.connect('yale.db')
+        cursor = conn.cursor()
+        
+        # Get comprehensive alumni data with experience history, education details, and company insights
+        query = """
+        SELECT 
+            p.person_id,
+            p.name,
+            p.position,
+            p.company,
+            p.location,
+            p.city,
+            p.country_code,
+            p.about,
+            p.connections,
+            p.followers,
+            p.recommendations_count,
+            p.educations_details,
+            cc.name as current_company_name,
+            cc.title as current_title,
+            GROUP_CONCAT(e.company || '|' || e.title || '|' || e.start_date || '|' || e.end_date || '|' || COALESCE(e.description, ''), '||') as experience_history,
+            GROUP_CONCAT(ed.title || '|' || ed.degree || '|' || ed.field || '|' || ed.start_year || '|' || ed.end_year, '||') as education_details,
+            ec.industry as company_industry,
+            ec.size as company_size,
+            ec.employee_count,
+            ec.yale_alumni_count
+        FROM clean_yale_profiles p
+        LEFT JOIN current_companies cc ON p.person_id = cc.person_id
+        LEFT JOIN clean_experiences e ON p.person_id = e.person_id
+        LEFT JOIN clean_educations ed ON p.person_id = ed.person_id
+        LEFT JOIN enhanced_companies ec ON (cc.name = ec.name OR p.company = ec.name)
+        WHERE p.name IS NOT NULL 
+        AND p.position IS NOT NULL
+        AND p.company IS NOT NULL
+        AND p.company != ''
+        GROUP BY p.person_id
+        ORDER BY p.connections DESC
+        LIMIT 5000
+        """
+        
+        cursor.execute(query)
+        profiles = cursor.fetchall()
+        
+        # Convert to list of dictionaries with enhanced parsing
+        data = []
+        for profile in profiles:
+            experience_history = []
+            if profile[14]:  # experience_history
+                for exp in profile[14].split('||'):
+                    if exp and '|' in exp:
+                        parts = exp.split('|')
+                        if len(parts) >= 4:
+                            experience_history.append({
+                                'company': parts[0],
+                                'title': parts[1],
+                                'start_date': parts[2],
+                                'end_date': parts[3],
+                                'description': parts[4] if len(parts) > 4 else ''
+                            })
+            
+            education_details = []
+            if profile[15]:  # education_details
+                for edu in profile[15].split('||'):
+                    if edu and '|' in edu:
+                        parts = edu.split('|')
+                        if len(parts) >= 5:
+                            education_details.append({
+                                'institution': parts[0],
+                                'degree': parts[1],
+                                'field': parts[2],
+                                'start_year': parts[3],
+                                'end_year': parts[4]
+                            })
+            
+            data.append({
+                'person_id': profile[0],
+                'name': profile[1],
+                'position': profile[2],
+                'company': profile[3],
+                'location': profile[4],
+                'city': profile[5],
+                'country_code': profile[6],
+                'about': profile[7],
+                'connections': profile[8],
+                'followers': profile[9],
+                'recommendations_count': profile[10],
+                'educations_details': profile[11],
+                'current_company_name': profile[12],
+                'current_title': profile[13],
+                'experience_history': experience_history,
+                'education_details': education_details,
+                'company_industry': profile[16],
+                'company_size': profile[17],
+                'employee_count': profile[18],
+                'yale_alumni_count': profile[19]
+            })
+        
+        conn.close()
+        print(f"✅ Loaded {len(data)} profiles from SQLite database")
+        return data
     
     def get_fallback_data(self):
         """Return minimal fallback data when database is not available"""

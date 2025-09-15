@@ -1,0 +1,72 @@
+[
+  {
+    "person_id": "sample_1",
+    "name": "Yale Alumnus A",
+    "position": "Software Engineer",
+    "company": "Google",
+    "location": "San Francisco, CA",
+    "about": "Yale Computer Science graduate working in technology",
+    "connections": 500,
+    "followers": 1000,
+    "recommendations_count": 5,
+    "educations_details": "Yale University - Computer Science",
+    "current_company_name": "Google",
+    "current_title": "Software Engineer",
+    "experience_history": [
+      {
+        "company": "Google",
+        "title": "Software Engineer",
+        "start_date": "2020",
+        "end_date": "Present",
+        "description": "Full-stack development"
+      }
+    ],
+    "education_details": [
+      {
+        "institution": "Yale University",
+        "degree": "Bachelor of Science",
+        "field": "Computer Science",
+        "start_year": "2016",
+        "end_year": "2020"
+      }
+    ],
+    "company_industry": "Technology",
+    "company_size": "10000+",
+    "yale_alumni_count": 150
+  },
+  {
+    "person_id": "sample_2",
+    "name": "Yale Alumnus B",
+    "position": "Investment Banking Analyst",
+    "company": "Goldman Sachs",
+    "location": "New York, NY",
+    "about": "Yale Economics graduate in finance",
+    "connections": 300,
+    "followers": 500,
+    "recommendations_count": 3,
+    "educations_details": "Yale University - Economics",
+    "current_company_name": "Goldman Sachs",
+    "current_title": "Investment Banking Analyst",
+    "experience_history": [
+      {
+        "company": "Goldman Sachs",
+        "title": "Investment Banking Analyst",
+        "start_date": "2021",
+        "end_date": "Present",
+        "description": "Financial analysis and modeling"
+      }
+    ],
+    "education_details": [
+      {
+        "institution": "Yale University",
+        "degree": "Bachelor of Arts",
+        "field": "Economics",
+        "start_year": "2017",
+        "end_year": "2021"
+      }
+    ],
+    "company_industry": "Finance",
+    "company_size": "5000+",
+    "yale_alumni_count": 200
+  }
+]
