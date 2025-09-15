@@ -91,7 +91,7 @@ export interface MiloResponse {
 export class MiloAPIService {
   private baseUrl = import.meta.env.VITE_MILO_API_URL || 
     (import.meta.env.PROD 
-      ? 'https://milo-ai-backend-production.up.railway.app' 
+      ? 'https://web-production-ef948.up.railway.app' 
       : 'http://localhost:8001');
 
   async generateOpportunities(userInput: string): Promise<MiloResponse> {
