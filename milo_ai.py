@@ -34,37 +34,33 @@ class MiloAI:
             # Get comprehensive alumni data with experience history, education details, and company insights
             query = """
             SELECT 
-                p.person_id,
-                p.name,
-                p.position,
-                p.company,
-                p.location,
-                p.city,
-                p.country_code,
-                p.about,
-                p.connections,
-                p.followers,
-                p.recommendations_count,
-                p.educations_details,
-                cc.name as current_company_name,
-                cc.title as current_title,
-                GROUP_CONCAT(e.company || '|' || e.title || '|' || e.start_date || '|' || e.end_date || '|' || COALESCE(e.description, ''), '||') as experience_history,
-                GROUP_CONCAT(ed.title || '|' || ed.degree || '|' || ed.field || '|' || ed.start_year || '|' || ed.end_year, '||') as education_details,
-                ec.industry as company_industry,
-                ec.size as company_size,
-                ec.employee_count,
-                ec.yale_alumni_count
-            FROM clean_yale_profiles p
-            LEFT JOIN current_companies cc ON p.person_id = cc.person_id
-            LEFT JOIN clean_experiences e ON p.person_id = e.person_id
-            LEFT JOIN clean_educations ed ON p.person_id = ed.person_id
-            LEFT JOIN enhanced_companies ec ON (cc.name = ec.name OR p.company = ec.name)
-            WHERE p.name IS NOT NULL 
-            AND p.position IS NOT NULL
-            AND p.company IS NOT NULL
-            AND p.company != ''
-            GROUP BY p.person_id
-            ORDER BY p.connections DESC
+                person_id,
+                name,
+                position,
+                current_company_name,
+                location,
+                city,
+                country_code,
+                about,
+                connections,
+                followers,
+                recommendations_count,
+                educations_details,
+                current_company_name as company,
+                position as current_title,
+                educations_details as experience_history,
+                educations_details as education_details,
+                '' as company_industry,
+                '' as company_size,
+                0 as employee_count,
+                0 as yale_alumni_count
+            FROM people
+            WHERE name IS NOT NULL 
+            AND position IS NOT NULL
+            AND current_company_name IS NOT NULL
+            AND current_company_name != ''
+            AND educations_details LIKE '%Yale%'
+            ORDER BY connections DESC
             LIMIT 5000
             """
             
