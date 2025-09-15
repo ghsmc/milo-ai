@@ -20,7 +20,9 @@ allowed_origins = [
     "http://localhost:3000", 
     "http://127.0.0.1:5173",
     "https://milo.now",
-    "https://www.milo.now"
+    "https://www.milo.now",
+    "https://milo-ai-frontend-production.up.railway.app",
+    "https://milo-ai-frontend-production-*.up.railway.app"
 ]
 
 # Add production origins from environment variable
@@ -29,8 +31,8 @@ if os.getenv("FRONTEND_URL"):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins for now
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
