@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from milo_ai import MiloAI
 import uvicorn
 import os
-from api_endpoints import api_app
+# Import will be done after app creation to avoid circular imports
 
 print("🚀 Starting Milo AI Backend...")
 print(f"📁 Working directory: {os.getcwd()}")
@@ -71,7 +71,12 @@ async def analyze_career(request: CareerRequest):
     return result
 
 # Mount the API endpoints
-app.mount("/api", api_app)
+try:
+    from simple_api import simple_api
+    app.mount("/api", simple_api)
+    print("✅ Simple API endpoints mounted successfully")
+except Exception as e:
+    print(f"⚠️  Could not mount API endpoints: {e}")
 
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=8001, reload=True)
