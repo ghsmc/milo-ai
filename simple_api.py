@@ -27,10 +27,26 @@ async def get_company_alumni(company_name: str, limit: int = Query(50, ge=1, le=
     company_lower = company_name.lower()
     filtered = []
     
+    # Use the same data source as the main analysis
     for alumni in milo.yale_data:
         current_company = (alumni.get('current_company_name') or alumni.get('company') or '').lower()
         
-        if company_lower in current_company or current_company in company_lower:
+        # Use the same flexible matching logic as the main analysis
+        target_words = [word for word in company_lower.split() if len(word) > 2]
+        company_words = [word for word in current_company.split() if len(word) > 2]
+        
+        # Check if any target word is in company name or vice versa
+        match_found = False
+        for target_word in target_words:
+            if any(target_word in company_word or company_word in target_word for company_word in company_words):
+                match_found = True
+                break
+        
+        # Also check the original simple matching as fallback
+        if not match_found:
+            match_found = company_lower in current_company or current_company in company_lower
+        
+        if match_found:
             education_info = milo.extract_detailed_education(alumni.get('education_details', []))
             
             filtered.append(AlumniProfile(
