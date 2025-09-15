@@ -72,7 +72,7 @@ async def analyze_career(request: CareerRequest):
 
 # Mount the API endpoints
 try:
-    from simple_api import simple_api
+    from api.simple_api import simple_api
     app.mount("/api", simple_api)
     print("✅ Simple API endpoints mounted successfully")
 except Exception as e:
