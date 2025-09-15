@@ -7,6 +7,8 @@ import os
 import sqlite3
 import re
 from dotenv import load_dotenv
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 # Load environment variables
 load_dotenv()
@@ -23,8 +25,13 @@ class MiloAI:
     def load_yale_data(self):
         """Load Yale alumni data from available sources"""
         try:
-            # Check for sample data (for Railway deployment)
-            if os.path.exists('sample_data.json'):
+            # First, try Railway PostgreSQL database
+            if os.getenv('DATABASE_URL'):
+                print("📊 Loading Yale dataset from Railway PostgreSQL...")
+                return self.load_from_postgres()
+            
+            # Check for sample data (for Railway deployment without DB)
+            elif os.path.exists('sample_data.json'):
                 print("📊 Loading sample Yale dataset...")
                 with open('sample_data.json', 'r', encoding='utf-8') as f:
                     data = json.load(f)
@@ -146,6 +153,81 @@ class MiloAI:
         conn.close()
         print(f"✅ Loaded {len(data)} profiles from SQLite database")
         return data
+    
+    def load_from_postgres(self):
+        """Load data from Railway PostgreSQL database"""
+        try:
+            db_url = os.getenv('DATABASE_URL')
+            conn = psycopg2.connect(db_url)
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            
+            # Check if yale_profiles table exists
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'yale_profiles'
+                );
+            """)
+            table_exists = cursor.fetchone()['exists']
+            
+            if not table_exists:
+                print("⚠️  yale_profiles table not found in PostgreSQL")
+                print("💡 Run the migration script first: python migrate_to_railway.py")
+                conn.close()
+                return self.get_fallback_data()
+            
+            # Get profiles from PostgreSQL
+            query = """
+            SELECT 
+                person_id, name, position, company, location, city, country_code,
+                about, connections, followers, recommendations_count, educations_details,
+                current_company_name, current_title, experience_history, education_details,
+                company_industry, company_size, employee_count, yale_alumni_count
+            FROM yale_profiles
+            WHERE name IS NOT NULL 
+            AND position IS NOT NULL
+            AND company IS NOT NULL
+            AND company != ''
+            ORDER BY connections DESC
+            LIMIT 10000
+            """
+            
+            cursor.execute(query)
+            profiles = cursor.fetchall()
+            
+            # Convert to list of dictionaries
+            data = []
+            for profile in profiles:
+                data.append({
+                    'person_id': profile['person_id'],
+                    'name': profile['name'],
+                    'position': profile['position'],
+                    'company': profile['company'],
+                    'location': profile['location'],
+                    'city': profile['city'],
+                    'country_code': profile['country_code'],
+                    'about': profile['about'],
+                    'connections': profile['connections'],
+                    'followers': profile['followers'],
+                    'recommendations_count': profile['recommendations_count'],
+                    'educations_details': profile['educations_details'],
+                    'current_company_name': profile['current_company_name'],
+                    'current_title': profile['current_title'],
+                    'experience_history': profile['experience_history'] or [],
+                    'education_details': profile['education_details'] or [],
+                    'company_industry': profile['company_industry'],
+                    'company_size': profile['company_size'],
+                    'employee_count': profile['employee_count'],
+                    'yale_alumni_count': profile['yale_alumni_count']
+                })
+            
+            conn.close()
+            print(f"✅ Loaded {len(data)} profiles from Railway PostgreSQL")
+            return data
+            
+        except Exception as e:
+            print(f"❌ Error loading from PostgreSQL: {e}")
+            return self.get_fallback_data()
     
     def get_fallback_data(self):
         """Return minimal fallback data when database is not available"""
