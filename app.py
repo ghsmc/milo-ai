@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from milo_ai import MiloAI
 import uvicorn
 import os
+from api_endpoints import api_app
 
 print("🚀 Starting Milo AI Backend...")
 print(f"📁 Working directory: {os.getcwd()}")
@@ -68,6 +69,9 @@ async def analyze_career(request: CareerRequest):
     """Analyze career goals and provide actionable plan"""
     result = await milo.analyze_career(request.user_input)
     return result
+
+# Mount the API endpoints
+app.mount("/api", api_app)
 
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=8001, reload=True)
