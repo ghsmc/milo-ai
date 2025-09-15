@@ -188,7 +188,7 @@ class MiloAI:
             AND position IS NOT NULL
             AND (current_company_name IS NOT NULL AND current_company_name != '' OR company IS NOT NULL AND company != '')
             ORDER BY connections DESC
-            LIMIT 10000
+            LIMIT 100000
             """
             
             cursor.execute(query)
