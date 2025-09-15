@@ -186,8 +186,7 @@ class MiloAI:
             FROM yale_profiles
             WHERE name IS NOT NULL 
             AND position IS NOT NULL
-            AND company IS NOT NULL
-            AND company != ''
+            AND (current_company_name IS NOT NULL AND current_company_name != '' OR company IS NOT NULL AND company != '')
             ORDER BY connections DESC
             LIMIT 10000
             """
