@@ -89,7 +89,9 @@ export interface MiloResponse {
 }
 
 export class MiloAPIService {
-  private baseUrl = 'http://localhost:8001';
+  private baseUrl = process.env.NODE_ENV === 'production' 
+    ? process.env.REACT_APP_API_URL || 'https://milo-ai-backend-production.up.railway.app'
+    : 'http://localhost:8001';
 
   async generateOpportunities(userInput: string): Promise<MiloResponse> {
     try {
