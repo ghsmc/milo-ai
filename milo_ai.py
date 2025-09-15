@@ -658,7 +658,10 @@ class MiloAI:
         
         for pattern in major_patterns:
             if re.search(pattern, educations_details, re.IGNORECASE):
-                return pattern.replace(r'[A-Z]', '').replace(r'[a-z]', '')
+                # Return the actual major found, not the regex pattern
+                match = re.search(pattern, educations_details, re.IGNORECASE)
+                if match:
+                    return match.group(0)
         
         return "Liberal Arts"
     
