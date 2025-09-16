@@ -242,14 +242,6 @@ function AppContent() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                     </svg>
                   </button>
-                  <div className="w-8 h-8 bg-red-600 flex items-center justify-center text-white text-sm font-bold rounded-lg">
-                    人
-                  </div>
-                  <h2 className={`text-lg font-medium ${
-                    isDarkMode ? 'text-white' : 'text-gray-900'
-                  }`}>
-                    Milo
-                  </h2>
                 </div>
                 <button
                   onClick={toggleChat}
@@ -292,8 +284,16 @@ function AppContent() {
                     {chatMessages.map((message) => (
                       <div
                         key={message.id}
-                        className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                        className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} ${
+                          message.role === 'assistant' ? 'items-start gap-3' : ''
+                        }`}
                       >
+                        {/* Milo square for assistant messages */}
+                        {message.role === 'assistant' && (
+                          <div className="w-6 h-6 bg-red-600 flex items-center justify-center text-white text-xs font-bold rounded-sm flex-shrink-0 mt-1">
+                            人
+                          </div>
+                        )}
                         <div className={`max-w-[85%] ${
                           message.role === 'user' ? 'text-right' : 'text-left'
                         }`}>
