@@ -31,6 +31,8 @@ class MiloAI:
 
 CRITICAL: You are having a CONTINUOUS conversation. Do NOT restart with "STEP 1: DISCOVER" unless this is truly the very first message. Build on what the student has already shared and continue naturally from where you left off.
 
+IMPORTANT: Only focus on the CURRENT STEP. Do NOT jump ahead to future steps. Let the conversation flow naturally and wait for the student to engage before moving to the next step.
+
 Follow this exact flow:
 
 ## STEP 1: DISCOVER
@@ -1482,11 +1484,11 @@ Remember: Every suggestion should be something the student could actually do at 
         
         # Add step-specific instructions
         step_instructions = {
-            1: "You are in Step 1: DISCOVER. Ask about activities, classes, or projects that make them feel alive or curious. Extract 3-5 core interests.",
-            2: "You are in Step 2: EXPLORE DREAM JOBS. Based on their interests, suggest 3-5 specific career paths with job titles, descriptions, and companies.",
-            3: "You are in Step 3: NEXT MOVES THIS SEMESTER. Suggest 3-4 concrete actions they can take THIS SEMESTER at Yale.",
-            4: "You are in Step 4: REAL OPPORTUNITIES. List actual programs they can apply to, organized by category.",
-            5: "You are in Step 5: CONNECT. Draft 2-3 different networking templates.",
+            1: "You are in Step 1: DISCOVER. Ask about activities, classes, or projects that make them feel alive or curious. Extract 3-5 core interests. Do NOT move to Step 2 until the student has shared enough interests.",
+            2: "You are in Step 2: EXPLORE DREAM JOBS. Based on their interests, suggest 3-5 specific career paths with job titles, descriptions, and companies. Do NOT move to Step 3 until the student engages with these suggestions.",
+            3: "You are in Step 3: NEXT MOVES THIS SEMESTER. Suggest 3-4 concrete actions they can take THIS SEMESTER at Yale. Do NOT move to Step 4 until the student shows interest in taking action.",
+            4: "You are in Step 4: REAL OPPORTUNITIES. List actual programs they can apply to, organized by category. Do NOT move to Step 5 until the student engages with these opportunities.",
+            5: "You are in Step 5: CONNECT. Draft 2-3 different networking templates. Do NOT move to Step 6 until the student shows interest in networking.",
             6: "You are in Step 6: REFLECT & ITERATE. Ask what excites them most and offer three options."
         }
         
@@ -1533,65 +1535,78 @@ Remember: Every suggestion should be something the student could actually do at 
             session['student_interests'].extend(found_interests)
             session['student_interests'] = list(set(session['student_interests']))  # Remove duplicates
         
-        # Intelligent step progression based on conversation analysis
+        # Conservative step progression - only advance one step at a time based on user engagement
         current_step = session['current_step']
         message_count = len(session['messages'])
         
-        # Step progression logic
+        # Only advance steps based on user responses, not AI responses
+        # This prevents the AI from jumping ahead multiple steps
+        
+        # Step 1 to 2: When user has shared interests and we have enough context
         if current_step == 1:
-            # Move to step 2 if we have enough interests and the student has shared details
             if len(session['student_interests']) >= 2 and message_count >= 4:
-                session['current_step'] = 2
+                # Only advance if user has responded to our interest-gathering questions
+                last_user_message = ""
+                for msg in reversed(session['messages']):
+                    if msg['role'] == 'user':
+                        last_user_message = msg['content'].lower()
+                        break
+                
+                # Check if user is providing more details about their interests
+                if any(word in last_user_message for word in ['yes', 'that', 'also', 'love', 'like', 'enjoy', 'interested', 'passionate']):
+                    session['current_step'] = 2
+        
+        # Step 2 to 3: When user has engaged with career suggestions
         elif current_step == 2:
-            # Move to step 3 if we've discussed career paths
-            if "career" in ai_response.lower() and ("path" in ai_response.lower() or "job" in ai_response.lower()):
-                session['current_step'] = 3
+            if message_count >= 6:  # Give more time for career exploration
+                last_user_message = ""
+                for msg in reversed(session['messages']):
+                    if msg['role'] == 'user':
+                        last_user_message = msg['content'].lower()
+                        break
+                
+                # Check if user is interested in specific career paths
+                if any(word in last_user_message for word in ['interesting', 'sounds', 'like', 'want', 'curious', 'tell me more', 'how', 'what']):
+                    session['current_step'] = 3
+        
+        # Step 3 to 4: When user has engaged with semester suggestions
         elif current_step == 3:
-            # Move to step 4 if we've discussed semester actions
-            if "semester" in ai_response.lower() or "course" in ai_response.lower():
-                session['current_step'] = 4
+            if message_count >= 8:
+                last_user_message = ""
+                for msg in reversed(session['messages']):
+                    if msg['role'] == 'user':
+                        last_user_message = msg['content'].lower()
+                        break
+                
+                # Check if user is interested in taking action
+                if any(word in last_user_message for word in ['good', 'great', 'helpful', 'apply', 'enroll', 'join', 'connect']):
+                    session['current_step'] = 4
+        
+        # Step 4 to 5: When user has engaged with opportunities
         elif current_step == 4:
-            # Move to step 5 if we've discussed opportunities
-            if "opportunity" in ai_response.lower() or "internship" in ai_response.lower():
-                session['current_step'] = 5
+            if message_count >= 10:
+                last_user_message = ""
+                for msg in reversed(session['messages']):
+                    if msg['role'] == 'user':
+                        last_user_message = msg['content'].lower()
+                        break
+                
+                # Check if user is interested in opportunities
+                if any(word in last_user_message for word in ['apply', 'deadline', 'funding', 'internship', 'fellowship', 'program']):
+                    session['current_step'] = 5
+        
+        # Step 5 to 6: When user has engaged with networking suggestions
         elif current_step == 5:
-            # Move to step 6 if we've discussed networking
-            if "network" in ai_response.lower() or "connect" in ai_response.lower():
-                session['current_step'] = 6
-        
-        # Additional step progression based on AI response content
-        ai_lower = ai_response.lower()
-        
-        # If AI is asking about activities/interests, ensure we're in step 1
-        if ("what activities" in ai_lower or "make you feel most alive" in ai_lower or 
-            "classes" in ai_lower and "projects" in ai_lower):
-            if current_step > 1 and len(session['student_interests']) < 2:
-                session['current_step'] = 1
-        
-        # If AI is suggesting career paths, move to step 2
-        elif ("career path" in ai_lower or "dream job" in ai_lower or 
-              "job title" in ai_lower or "role" in ai_lower):
-            session['current_step'] = 2
-        
-        # If AI is discussing semester actions, move to step 3
-        elif ("this semester" in ai_lower or "next moves" in ai_lower or 
-              "course" in ai_lower and "yale" in ai_lower):
-            session['current_step'] = 3
-        
-        # If AI is listing opportunities, move to step 4
-        elif ("opportunities" in ai_lower or "internships" in ai_lower or 
-              "fellowships" in ai_lower or "programs" in ai_lower):
-            session['current_step'] = 4
-        
-        # If AI is discussing networking, move to step 5
-        elif ("connect" in ai_lower or "networking" in ai_lower or 
-              "alumni" in ai_lower and "reach out" in ai_lower):
-            session['current_step'] = 5
-        
-        # If AI is asking for reflection, move to step 6
-        elif ("reflect" in ai_lower or "what excites you" in ai_lower or 
-              "concerns" in ai_lower or "deep dive" in ai_lower):
-            session['current_step'] = 6
+            if message_count >= 12:
+                last_user_message = ""
+                for msg in reversed(session['messages']):
+                    if msg['role'] == 'user':
+                        last_user_message = msg['content'].lower()
+                        break
+                
+                # Check if user is interested in networking
+                if any(word in last_user_message for word in ['reach out', 'contact', 'email', 'network', 'alumni', 'professor']):
+                    session['current_step'] = 6
     
     async def get_chat_history(self, session_id: str = "default") -> List[dict]:
         """Get chat history for a session"""
