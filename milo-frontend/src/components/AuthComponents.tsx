@@ -8,7 +8,12 @@ export const SignInComponent: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-
+        {/* Milo Logo */}
+        <div className="flex items-center justify-center mb-8">
+          <div className="w-12 h-12 bg-red-600 flex items-center justify-center text-white text-lg font-bold shadow-lg border border-red-700 rounded-sm">
+            人
+          </div>
+        </div>
         
         <SignIn 
           afterSignInUrl="/dashboard"
@@ -51,7 +56,12 @@ export const SignUpComponent: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-
+        {/* Milo Logo */}
+        <div className="flex items-center justify-center mb-8">
+          <div className="w-12 h-12 bg-red-600 flex items-center justify-center text-white text-lg font-bold shadow-lg border border-red-700 rounded-sm">
+            人
+          </div>
+        </div>
         
         <SignUp 
           afterSignUpUrl="/onboarding"
