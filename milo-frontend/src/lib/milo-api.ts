@@ -88,9 +88,137 @@ export interface MiloResponse {
   error?: string;
 }
 
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+}
+
+export interface SessionInfo {
+  session_id: string;
+  current_step: number;
+  student_interests: string[];
+  career_paths: string[];
+  message_count: number;
+  created_at: string;
+  last_updated: string;
+}
+
 export class MiloAPIService {
   private baseUrl = 'https://web-production-ef948.up.railway.app';
 
+  // New streaming chat methods
+  async streamChatResponse(
+    message: string, 
+    sessionId: string = 'default',
+    onChunk: (chunk: string) => void,
+    onComplete: () => void,
+    onError: (error: string) => void
+  ): Promise<void> {
+    try {
+      const response = await fetch(`${this.baseUrl}/chat/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: message,
+          session_id: sessionId
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.error) {
+                onError(data.error);
+                return;
+              }
+              
+              if (data.done) {
+                onComplete();
+                return;
+              }
+              
+              if (data.content) {
+                onChunk(data.content);
+              }
+            } catch (e) {
+              console.error('Error parsing SSE data:', e);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Streaming chat error:', error);
+      onError(error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+
+  async getChatHistory(sessionId: string = 'default'): Promise<ChatMessage[]> {
+    try {
+      const response = await fetch(`${this.baseUrl}/chat/history/${sessionId}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      return data.messages || [];
+    } catch (error) {
+      console.error('Error getting chat history:', error);
+      return [];
+    }
+  }
+
+  async getSessionInfo(sessionId: string = 'default'): Promise<SessionInfo | null> {
+    try {
+      const response = await fetch(`${this.baseUrl}/chat/session/${sessionId}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error getting session info:', error);
+      return null;
+    }
+  }
+
+  async clearSession(sessionId: string = 'default'): Promise<void> {
+    try {
+      const response = await fetch(`${this.baseUrl}/chat/session/${sessionId}`, {
+        method: 'DELETE'
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('Error clearing session:', error);
+    }
+  }
+
+  // Legacy method for backward compatibility
   async generateOpportunities(userInput: string): Promise<MiloResponse> {
     try {
       const response = await fetch(`${this.baseUrl}/analyze`, {

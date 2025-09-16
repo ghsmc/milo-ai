@@ -1,6 +1,14 @@
 # Milo AI - Yale Career Assistant
 
-A FastAPI-based career guidance application that helps Yale students plan their career paths using AI and real alumni data.
+A FastAPI-based career guidance application that helps Yale students discover their career paths through AI-powered conversations and real alumni data.
+
+## 🚀 New Features
+
+- **Streaming Chat**: Real-time conversational career guidance
+- **6-Step Career Discovery**: Structured conversation flow
+- **Latest AI Model**: Powered by GPT-4o
+- **Conversation Context**: Maintains chat history and student interests
+- **Yale-Specific Resources**: Deep knowledge of Yale programs and alumni
 
 ## Setup Instructions
 

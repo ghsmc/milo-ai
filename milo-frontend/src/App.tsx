@@ -11,7 +11,7 @@ import Feed from './components/Feed';
 import { mockJobCards } from './data/mockJobCards';
 import { OnboardingData } from './lib/supabase.ts';
 import { DarkModeProvider, useDarkMode } from './contexts/DarkModeContext';
-import { miloAPIService, MiloResponse, AlumniProfile } from './lib/milo-api.ts';
+import { miloAPIService, AlumniProfile } from './lib/milo-api.ts';
 import ReactMarkdown from 'react-markdown';
 
 interface ChatMessage {
@@ -101,7 +101,7 @@ function AppContent() {
     }));
   };
 
-  // Chat functions
+  // Chat functions - Updated to use streaming chat
   const sendMessage = async (message: string) => {
     if (!message.trim()) return;
 
@@ -118,116 +118,57 @@ function AppContent() {
     setChatMessages(prev => [...prev, userMessage]);
     setIsTyping(true);
     
+    // Create assistant message for streaming
+    const assistantMessage = {
+      id: `assistant-${Date.now()}-${Math.random()}`,
+      role: 'assistant' as const,
+      content: '',
+      timestamp: new Date()
+    };
+    
+    setChatMessages(prev => [...prev, assistantMessage]);
+    
     try {
-      console.log('🎯 Sending message to Milo API:', { message });
+      console.log('🎯 Sending message to streaming chat API:', { message });
       
-      // Call our enhanced Milo API
-      const response: MiloResponse = await miloAPIService.generateOpportunities(message);
-      console.log('📊 Milo API Response:', response);
-      
-      // Ensure response has the expected structure
-      console.log('🔍 Response validation:', {
-        hasResponse: !!response,
-        hasActionPlan: !!response?.action_plan,
-        hasPlan: !!response?.action_plan?.plan,
-        hasError: !!response?.error,
-        responseKeys: response && typeof response === 'object' ? Object.keys(response) : 'no response'
-      });
-      
-      // Check for error response first
-      if (response?.error) {
-        console.error('❌ API returned error:', response.error);
-        // Show error message to user instead of throwing
-        const errorMessage = {
-          id: `error-${Date.now()}-${Math.random()}`,
-          role: 'assistant' as const,
-          content: `I'm sorry, I encountered an error while processing your request: ${response.error}\n\nPlease try again or rephrase your question.`,
-          timestamp: new Date().toISOString()
-        };
-        setChatMessages(prev => [...prev, errorMessage]);
-        return;
-      }
-      
-      if (!response || !response.action_plan || !response.action_plan.plan) {
-        console.error('❌ Invalid response structure:', response);
-        throw new Error('Invalid response structure from Milo API');
-      }
-      
-      // Create the main response message with personalized greeting
-      const mainResponse = {
-        id: `response-${Date.now()}-${Math.random()}`,
-        role: 'assistant' as const,
-        content: response.action_plan.plan,
-        timestamp: new Date()
-      };
-      
-      setChatMessages(prev => [...prev, mainResponse]);
-      
-      // Add company cards if multiple companies were detected
-      if (response.processed_query && response.processed_query.detected_companies && Array.isArray(response.processed_query.detected_companies) && response.processed_query.detected_companies.length > 1) {
-        const companyCardsMessage = {
-          id: `companies-${Date.now()}-${Math.random()}`,
-          role: 'assistant' as const,
-          content: `**🏢 Target Companies in ${response.processed_query?.detected_industry}**\n\nFound ${response.processed_query.detected_companies.length} top companies in this industry.`,
-          timestamp: new Date(),
-          companyData: response.processed_query.detected_companies.map((company: string) => ({
-            name: company,
-            domain: company.toLowerCase().replace(/\s+/g, ''),
-            industry: response.processed_query?.detected_industry,
-            relevance: 95 // High relevance for detected companies
-          }))
-        };
-        setChatMessages(prev => [...prev, companyCardsMessage]);
-      }
-      
-      // Add alumni data if available
-      if (response.target_company_alumni && Array.isArray(response.target_company_alumni) && response.target_company_alumni.length > 0) {
-        const alumniMessage = {
-          id: `alumni-${Date.now()}-${Math.random()}`,
-          role: 'assistant' as const,
-          content: `**🎓 Yale Alumni at Target Companies**\n\nFound ${response.target_company_alumni.length} Yale alumni at your target companies.`,
-          timestamp: new Date(),
-          alumniData: response.target_company_alumni
-        };
-        setChatMessages(prev => [...prev, alumniMessage]);
-      }
-      
-      // Add career paths if available
-      if (response.career_paths && Array.isArray(response.career_paths) && response.career_paths.length > 0) {
-        const pathsMessage = {
-          id: `paths-${Date.now()}-${Math.random()}`,
-          role: 'assistant' as const,
-          content: `**🛤️ Common Career Paths**\n\n${JSON.stringify(response.career_paths)}`,
-          timestamp: new Date()
-        };
-        setChatMessages(prev => [...prev, pathsMessage]);
-      }
-      
-      // Add people to contact if available
-      if (response.people_to_contact && Array.isArray(response.people_to_contact) && response.people_to_contact.length > 0) {
-        const contactMessage = {
-          id: `contact-${Date.now()}-${Math.random()}`,
-          role: 'assistant' as const,
-          content: `**👥 People to Contact First**\n\nThese are the top alumni you should reach out to based on your goals and background.`,
-          peopleToContact: response.people_to_contact,
-          timestamp: new Date()
-        };
-        setChatMessages(prev => [...prev, contactMessage]);
-      }
+      // Use the new streaming chat API
+      await miloAPIService.streamChatResponse(
+        message,
+        'default', // session ID
+        (chunk: string) => {
+          // Update the assistant message with streaming content
+          setChatMessages(prev => prev.map(msg => 
+            msg.id === assistantMessage.id 
+              ? { ...msg, content: msg.content + chunk }
+              : msg
+          ));
+        },
+        () => {
+          // Streaming complete
+          console.log('✅ Streaming chat completed');
+          setIsTyping(false);
+        },
+        (error: string) => {
+          // Handle error
+          console.error('❌ Streaming chat error:', error);
+          setChatMessages(prev => prev.map(msg => 
+            msg.id === assistantMessage.id 
+              ? { ...msg, content: `❌ **Error:** ${error}\n\nPlease try again.` }
+              : msg
+          ));
+          setIsTyping(false);
+        }
+      );
       
     } catch (error) {
       console.error('❌ Chat error:', error);
       
-      // Add error message
-      const errorMessage = {
-        id: `error-${Date.now()}-${Math.random()}`,
-        role: 'assistant' as const,
-        content: `❌ **Error:** ${error instanceof Error ? error.message : 'Something went wrong'}\n\nPlease try again or check the server connection.`,
-        timestamp: new Date()
-      };
-      
-      setChatMessages(prev => [...prev, errorMessage]);
-    } finally {
+      // Update the assistant message with error
+      setChatMessages(prev => prev.map(msg => 
+        msg.id === assistantMessage.id 
+          ? { ...msg, content: `❌ **Error:** ${error instanceof Error ? error.message : 'Something went wrong'}\n\nPlease try again or check the server connection.` }
+          : msg
+      ));
       setIsTyping(false);
     }
   };
@@ -241,6 +182,17 @@ function AppContent() {
       setShowChat(false);
       setHasStartedChat(false);
       setChatMessages([]);
+    }
+  };
+
+  const clearChatSession = async () => {
+    try {
+      await miloAPIService.clearSession('default');
+      setChatMessages([]);
+      setHasStartedChat(false);
+      console.log('✅ Chat session cleared');
+    } catch (error) {
+      console.error('❌ Error clearing chat session:', error);
     }
   };
 
@@ -345,6 +297,20 @@ function AppContent() {
               {/* Chat Messages - Increased width, markdown rendering, user message styling */}
               {hasStartedChat && (
                 <div className="flex-1 overflow-y-auto w-full">
+                  {/* Chat Header with Clear Session Button */}
+                  <div className="max-w-4xl mx-auto px-4 py-4 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex justify-between items-center">
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        🎓 Milo - Yale Career Advisor
+                      </div>
+                      <button
+                        onClick={clearChatSession}
+                        className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 rounded-md transition-colors"
+                      >
+                        Clear Session
+                      </button>
+                    </div>
+                  </div>
                   <div className="max-w-4xl mx-auto px-4 py-6 pb-16 space-y-8">
                     {chatMessages.map((message) => (
                       <div
