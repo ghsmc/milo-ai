@@ -1,7 +1,7 @@
 from openai import AsyncOpenAI
 import json
 import pandas as pd
-from typing import Dict, List
+from typing import Dict, List, AsyncGenerator
 import asyncio
 import os
 import sqlite3
@@ -9,6 +9,7 @@ import re
 from dotenv import load_dotenv
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -21,6 +22,122 @@ class MiloAI:
             raise ValueError("OPENAI_API_KEY environment variable is required")
         self.client = AsyncOpenAI(api_key=api_key)
         self.yale_data = self.load_yale_data()
+        
+        # Conversation context management
+        self.conversation_sessions = {}
+        
+        # Master prompt for the 6-step conversation flow
+        self.master_prompt = """You are a Yale career advisor AI that helps students discover their path through a structured 6-step conversation. You have deep knowledge of Yale-specific resources, programs, and alumni networks. Follow this exact flow:
+
+## STEP 1: DISCOVER
+Start by asking: "What activities, classes, or projects at Yale make you feel most alive or curious?"
+
+When the student responds, extract 3-5 core interests/themes. Be specific about Yale contexts they mention.
+
+## STEP 2: EXPLORE DREAM JOBS
+Based on their interests, suggest 3-5 specific career paths that combine their passions. For each role:
+- Give the job title in bold
+- Write a one-sentence description showing how it connects their interests
+- Mention 1-2 companies/organizations where Yale alums work in this role
+- Include surprising or non-obvious options they might not have considered
+
+## STEP 3: NEXT MOVES THIS SEMESTER
+For their top career interest, suggest 3-4 concrete actions they can take THIS SEMESTER at Yale:
+- Specific Yale courses (with actual course codes when possible)
+- Yale student organizations or labs to join
+- Yale faculty doing relevant work
+- Campus resources (CCPD, OCS, specific libraries/centers)
+
+## STEP 4: REAL OPPORTUNITIES
+List actual programs they can apply to, organized by category:
+
+**Summer Internships** (3-4 specific programs)
+- Include application deadlines
+- Note if they're paid/unpaid
+- Mention Yale funding that could support unpaid ones
+
+**Yale Fellowships & Funding**
+- Light Fellowship (freshman/sophomores)
+- ISA (International Summer Award)
+- Richter Fellowship
+- CIPE Summer Fellowships
+- Bulldogs Abroad programs
+- Other relevant Yale grants
+
+**On-Campus Opportunities**
+- Research labs hiring undergrads
+- Yale centers looking for student fellows
+- Work-study positions in relevant departments
+
+## STEP 5: CONNECT
+Draft 2-3 different networking templates:
+
+1. **Cold outreach to Yale alum** in their field of interest
+   - Keep it under 5 sentences
+   - Mention specific shared Yale connection
+   - One specific question to ask
+
+2. **Professor office hours conversation starter**
+   - Which Yale professor to approach
+   - What research/project to ask about
+
+3. **Informational interview request** for Yale alumni database
+   - How to use Yale Career Network (YCN)
+   - Specific search terms to use
+
+## STEP 6: REFLECT & ITERATE
+Ask: "After exploring these paths, what excites you most? What concerns you?"
+
+Then offer three options:
+a) Deep dive into one specific path with a 30-day action plan
+b) Explore an alternative career combining their interests differently  
+c) Get connected to specific Yale resources/people who can help
+
+## KNOWLEDGE BASE TO REFERENCE:
+
+**Yale-Specific Resources:**
+- CCPD (Center for Career & Professional Development)
+- OCS (Office of Career Strategy) 
+- Yale Career Network (YCN) for alumni
+- Journalism Initiative
+- Jackson School (global affairs)
+- CEID (Center for Engineering Innovation & Design)
+- Tsai CITY (Center for Innovative Thinking)
+- Digital Humanities Lab
+- Every Yale residential college has career advisors
+- Yale Science & Engineering Association (YSEA)
+- Yale Entrepreneurial Institute (YEI)
+
+**Funding Sources:**
+- International Summer Award (ISA) - funds unpaid international internships
+- CIPE Fellowships - career exploration grants
+- Richter Fellowship - independent research
+- Light Fellowship - freshman/sophomore exploration
+- Bulldogs Abroad - funded programs in specific cities
+- First-Year Summer Funding - for students on financial aid
+- Public Service Funding through Dwight Hall
+
+**Key Timelines:**
+- Light Fellowship: Usually due in February
+- ISA: March deadline
+- Summer internship apps: Rolling, but many close Jan-March
+- Richter: February deadline
+- Yale Career Fairs: September & February
+
+## INTERACTION STYLE:
+- Be conversational but efficient
+- Use bullet points for clarity
+- Bold important program names and deadlines
+- Include specific Yale building names, course numbers when relevant
+- Reference actual Yale alums when possible (without making up names)
+- If unsure about a specific deadline or program detail, say "Check with CCPD for current deadline"
+
+## EXAMPLE INTERACTION START:
+Student: "I love data science, global issues, and writing."
+
+Your response should follow ALL 6 STEPS, creating a comprehensive career exploration session that feels personalized and actionable, grounded in real Yale resources.
+
+Remember: Every suggestion should be something the student could actually do at Yale or through Yale connections. No generic advice - everything Yale-specific and actionable."""
         
     def load_yale_data(self):
         """Load Yale alumni data from available sources"""
@@ -1267,3 +1384,163 @@ class MiloAI:
                 insights.append(f"  • {stage}: {count} alumni ({percentage:.1f}%)")
         
         return "\n".join(insights) if insights else "No trends data available"
+    
+    # ===== NEW STREAMING CHAT METHODS =====
+    
+    def get_or_create_session(self, session_id: str) -> dict:
+        """Get or create a conversation session with context"""
+        if session_id not in self.conversation_sessions:
+            self.conversation_sessions[session_id] = {
+                'messages': [],
+                'current_step': 1,
+                'student_interests': [],
+                'career_paths': [],
+                'created_at': datetime.now().isoformat(),
+                'last_updated': datetime.now().isoformat()
+            }
+        return self.conversation_sessions[session_id]
+    
+    def update_session(self, session_id: str, **updates):
+        """Update session data"""
+        if session_id in self.conversation_sessions:
+            self.conversation_sessions[session_id].update(updates)
+            self.conversation_sessions[session_id]['last_updated'] = datetime.now().isoformat()
+    
+    async def stream_chat_response(self, user_message: str, session_id: str = "default") -> AsyncGenerator[str, None]:
+        """Stream chat response using the new 6-step conversation flow"""
+        try:
+            # Get or create session
+            session = self.get_or_create_session(session_id)
+            
+            # Add user message to conversation history
+            session['messages'].append({
+                'role': 'user',
+                'content': user_message,
+                'timestamp': datetime.now().isoformat()
+            })
+            
+            # Build conversation context
+            conversation_context = self._build_conversation_context(session)
+            
+            # Create the full prompt with context
+            full_prompt = f"{self.master_prompt}\n\n{conversation_context}"
+            
+            # Stream response from OpenAI
+            stream = await self.client.chat.completions.create(
+                model="gpt-4o",  # Using latest model
+                messages=[
+                    {"role": "system", "content": full_prompt}
+                ],
+                stream=True,
+                temperature=0.7,
+                max_tokens=2000
+            )
+            
+            # Collect full response for session storage
+            full_response = ""
+            
+            async for chunk in stream:
+                if chunk.choices[0].delta.content is not None:
+                    content = chunk.choices[0].delta.content
+                    full_response += content
+                    yield content
+            
+            # Add assistant response to conversation history
+            session['messages'].append({
+                'role': 'assistant',
+                'content': full_response,
+                'timestamp': datetime.now().isoformat()
+            })
+            
+            # Update session with extracted information
+            self._extract_and_store_session_data(session, user_message, full_response)
+            
+        except Exception as e:
+            error_msg = f"Error in chat: {str(e)}"
+            yield error_msg
+            print(f"Chat error: {error_msg}")
+    
+    def _build_conversation_context(self, session: dict) -> str:
+        """Build conversation context from session history"""
+        if not session['messages']:
+            return "This is the start of a new conversation. Follow Step 1 of the 6-step process."
+        
+        context_parts = []
+        
+        # Add conversation history
+        context_parts.append("## CONVERSATION HISTORY:")
+        for msg in session['messages'][-6:]:  # Last 6 messages for context
+            role = "Student" if msg['role'] == 'user' else "Milo"
+            context_parts.append(f"{role}: {msg['content']}")
+        
+        # Add current step information
+        context_parts.append(f"\n## CURRENT STEP: {session['current_step']}")
+        
+        # Add extracted interests if available
+        if session['student_interests']:
+            context_parts.append(f"\n## EXTRACTED INTERESTS: {', '.join(session['student_interests'])}")
+        
+        # Add career paths if available
+        if session['career_paths']:
+            context_parts.append(f"\n## SUGGESTED CAREER PATHS: {', '.join(session['career_paths'])}")
+        
+        return "\n".join(context_parts)
+    
+    def _extract_and_store_session_data(self, session: dict, user_message: str, ai_response: str):
+        """Extract and store relevant data from the conversation"""
+        # Extract interests from user message (simple keyword matching)
+        interest_keywords = [
+            'data science', 'machine learning', 'artificial intelligence', 'programming', 'coding',
+            'writing', 'journalism', 'communication', 'media', 'publishing',
+            'business', 'finance', 'consulting', 'entrepreneurship', 'startup',
+            'research', 'academia', 'teaching', 'education',
+            'healthcare', 'medicine', 'public health', 'policy',
+            'law', 'legal', 'government', 'politics', 'public service',
+            'art', 'design', 'creative', 'music', 'theater', 'film',
+            'environment', 'sustainability', 'climate', 'energy',
+            'international', 'global', 'foreign', 'language', 'culture'
+        ]
+        
+        user_lower = user_message.lower()
+        found_interests = [interest for interest in interest_keywords if interest in user_lower]
+        
+        if found_interests:
+            session['student_interests'].extend(found_interests)
+            session['student_interests'] = list(set(session['student_interests']))  # Remove duplicates
+        
+        # Determine current step based on conversation flow
+        if "what activities" in ai_response.lower() or "make you feel most alive" in ai_response.lower():
+            session['current_step'] = 1
+        elif "dream jobs" in ai_response.lower() or "career paths" in ai_response.lower():
+            session['current_step'] = 2
+        elif "this semester" in ai_response.lower() or "next moves" in ai_response.lower():
+            session['current_step'] = 3
+        elif "opportunities" in ai_response.lower() or "internships" in ai_response.lower():
+            session['current_step'] = 4
+        elif "connect" in ai_response.lower() or "networking" in ai_response.lower():
+            session['current_step'] = 5
+        elif "reflect" in ai_response.lower() or "what excites you" in ai_response.lower():
+            session['current_step'] = 6
+    
+    async def get_chat_history(self, session_id: str = "default") -> List[dict]:
+        """Get chat history for a session"""
+        session = self.get_or_create_session(session_id)
+        return session['messages']
+    
+    def clear_session(self, session_id: str = "default"):
+        """Clear a conversation session"""
+        if session_id in self.conversation_sessions:
+            del self.conversation_sessions[session_id]
+    
+    def get_session_info(self, session_id: str = "default") -> dict:
+        """Get session information"""
+        session = self.get_or_create_session(session_id)
+        return {
+            'session_id': session_id,
+            'current_step': session['current_step'],
+            'student_interests': session['student_interests'],
+            'career_paths': session['career_paths'],
+            'message_count': len(session['messages']),
+            'created_at': session['created_at'],
+            'last_updated': session['last_updated']
+        }
